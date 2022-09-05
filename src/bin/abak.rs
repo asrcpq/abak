@@ -1,9 +1,8 @@
 use abak::aosync;
 
 fn main() {
-	let mut iter = std::env::args();
-	iter.next();
-	let src = iter.next().unwrap();
-	let dst = iter.next().unwrap();
-	aosync(&src, &dst);
+	let aarg = aarg::parse().unwrap();
+	let dry_run = aarg.get("--dry").is_some();
+	let dirs = aarg.get("").unwrap();
+	aosync(&dirs[1], &dirs[2], dry_run);
 }

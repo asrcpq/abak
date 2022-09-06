@@ -3,7 +3,7 @@
 incremental backup my append-only filesystem (aofs),
 both src and dst directory can be mounted as append-only during backup.
 
-# Notes
+# limitations
 
 ## abak is incomplete!
 
@@ -17,12 +17,9 @@ fail in middle will not cause any data change.
 
 ## prevent data change during write
 
-make sure that no other process is writing to dst during backup:
+Currently no other process should be writing to src/dst during backup:
 
-* this is usually not a problem for backup drive
+* usually not a problem for backup drive
 
-* writing to src could also cause problem, but not very likely to cause error
-(need furthur investigation).
-
-* The best choice is to manually lock src for read only before sync,
+* current solution is to manually lock src for read only before sync,
 and make dst only writable from this process.

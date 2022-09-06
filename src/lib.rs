@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use std::os::unix::fs::MetadataExt;
 use std::io::{Read, Write, Seek};
 use std::ffi::OsString;
+use rand::Rng;
 
 struct SyncItem {
 	pub src: PathBuf,
@@ -75,12 +76,51 @@ fn sample_objects(prefix: &PathBuf, path_list: &[PathBuf]) -> Vec<OrdTest> {
 	objects
 }
 
+const BUFLEN: usize = 1 << 20;
+
+struct AppendChecker {
+	buf1: [u8; BUFLEN],
+	buf2: [u8; BUFLEN],
+}
+
+impl Default for AppendChecker {
+	fn default() -> Self {
+		Self {
+			buf1: [0; BUFLEN],
+			buf2: [0; BUFLEN],
+		}
+	}
+}
+
+impl AppendChecker {
+	// src can be longer than dst
+	fn is_append_of(&mut self, src: &PathBuf, dst: &PathBuf) -> bool {
+		let mut src_reader = std::fs::File::open(src).unwrap();
+		let size = std::fs::metadata(dst).unwrap().size() / BUFLEN as u64;
+		let show_progress = size > 100;
+		let mut dst_reader = std::fs::File::open(dst).unwrap();
+		let mut count = 0;
+		loop {
+			let size2 = dst_reader.read(&mut self.buf2).unwrap();
+			if size2 == 0 { break true }
+			src_reader.read(&mut self.buf1).unwrap();
+			// dst is shorter
+			if self.buf1[..size2] != self.buf2[..size2] { break false }
+
+			if show_progress {
+				eprint!("\x1b[2Kprogress {}/{}\r", count, size);
+				count += 1;
+			}
+		}
+	}
+}
+
 // only sync file, not directory(but mkdir when necessary)
-pub fn aosync(src: &str, dst: &str, dry_run: bool) {
+pub fn aosync(src: &str, dst: &str, dry_run: bool, check_ratio: f32) {
 	let src = PathBuf::from(src);
 	let dst = PathBuf::from(dst);
-	let mut buf1 = [0u8; 1 << 20];
-	let mut buf2 = [0u8; 1 << 20];
+	let mut rng = rand::thread_rng();
+	let mut append_checker = AppendChecker::default();
 	if !std::path::Path::new(&dst).exists() {
 		std::fs::create_dir(&dst).unwrap();
 	}
@@ -132,9 +172,17 @@ pub fn aosync(src: &str, dst: &str, dry_run: bool) {
 					list_src.push(p_src);
 					list_dst.push(p_dst);
 				} else {
+					if rng.gen::<f32>() < check_ratio {
+						eprintln!("Fcmp {} {:?}\r", same_count, p_dst.file_name().unwrap());
+						if !append_checker.is_append_of(
+							&src.clone().join(&p_src),
+							&dst.clone().join(&p_dst),
+						) {
+							panic!("Size match but comparison fail {:?}", p_dst);
+						}
+					}
 					same_count += 1;
 				}
-				// TODO: option full compare content of src and dst
 			},
 		}
 	}
@@ -162,16 +210,7 @@ pub fn aosync(src: &str, dst: &str, dry_run: bool) {
 				}
 
 				// exact match
-				let mut src_reader = std::fs::File::open(&src_obj.full_path).unwrap();
-				let mut dst_reader = std::fs::File::open(&dst_obj.full_path).unwrap();
-				let success = loop {
-					let size2 = dst_reader.read(&mut buf2).unwrap();
-					if size2 == 0 { break true }
-					src_reader.read(&mut buf1).unwrap();
-					// dst is shorter
-					if buf1[..size2] != buf2[..size2] { break false }
-				};
-				if !success {
+				if !append_checker.is_append_of(&src_obj.full_path, &dst_obj.full_path) {
 					continue
 				}
 
@@ -219,34 +258,11 @@ pub fn aosync(src: &str, dst: &str, dry_run: bool) {
 	assert_eq!(sum, original_src_len);
 
 	// perform the update
-	for item in new_items.iter() {
-		if dry_run {
-			eprintln!("Sync {:?} to {:?}, offset {}", item.src, item.dst, item.offset);
-			continue
-		}
-		let concat_src = src.clone().join(&item.src);
-		let concat_dst = dst.clone().join(&item.dst);
-		std::fs::create_dir_all(concat_dst.parent().unwrap()).unwrap();
-		let mut dst_file = std::fs::OpenOptions::new()
-			.create_new(true)
-			.write(true)
-			.open(&concat_dst)
-			.unwrap();
-		let mut src_file = std::fs::File::open(&concat_src).unwrap();
-		src_file.seek(std::io::SeekFrom::Start(item.offset)).unwrap();
-		loop {
-			let size = src_file.read(&mut buf1).unwrap();
-			if size == 0 {
-				break
-			}
-			dst_file.write_all(&buf1[..size]).unwrap();
-		}
-	}
-
 	let mut final_move_list = Vec::new();
+	let mut buf = [0u8; BUFLEN];
 	for item in append_items.iter() {
+		eprintln!("Append {:?} to {:?}, offset {}", item.src, item.dst, item.offset);
 		if dry_run {
-			eprintln!("Sync {:?} to {:?}, offset {}", item.src, item.dst, item.offset);
 			continue
 		}
 		let concat_src = src.clone().join(&item.src);
@@ -262,14 +278,39 @@ pub fn aosync(src: &str, dst: &str, dry_run: bool) {
 		let mut src_file = std::fs::File::open(&concat_src).unwrap();
 		src_file.seek(std::io::SeekFrom::Start(item.offset)).unwrap();
 		loop {
-			let size = src_file.read(&mut buf1).unwrap();
+			let size = src_file.read(&mut buf).unwrap();
 			if size == 0 {
 				break
 			}
-			dst_file.write_all(&buf1[..size]).unwrap();
+			dst_file.write_all(&buf[..size]).unwrap();
 		}
 		final_move_list.push((concat_dst_tmp, concat_dst_moved));
 	}
+
+	for item in new_items.iter() {
+		eprintln!("Create {:?}", item.src);
+		if dry_run {
+			continue
+		}
+		let concat_src = src.clone().join(&item.src);
+		let concat_dst = dst.clone().join(&item.dst);
+		std::fs::create_dir_all(concat_dst.parent().unwrap()).unwrap();
+		let mut dst_file = std::fs::OpenOptions::new()
+			.create_new(true)
+			.write(true)
+			.open(&concat_dst)
+			.unwrap();
+		let mut src_file = std::fs::File::open(&concat_src).unwrap();
+		src_file.seek(std::io::SeekFrom::Start(item.offset)).unwrap();
+		loop {
+			let size = src_file.read(&mut buf).unwrap();
+			if size == 0 {
+				break
+			}
+			dst_file.write_all(&buf[..size]).unwrap();
+		}
+	}
+
 
 	for (src, dst) in final_move_list.into_iter() {
 		std::fs::rename(&src, &dst).unwrap();

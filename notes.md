@@ -1,3 +1,3 @@
-change: finish first version
+change: full comparison
 
-todo: clean, add test, full comparison
+todo: clean, add test

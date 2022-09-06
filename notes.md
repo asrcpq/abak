@@ -1,3 +1,3 @@
-change: split functions
+change: improve debug msg
 
 todo: split, add test

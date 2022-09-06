@@ -23,7 +23,7 @@ impl AppendChecker {
 	pub fn is_append_of(&mut self, src: &PathBuf, dst: &PathBuf) -> bool {
 		let mut src_reader = std::fs::File::open(src).unwrap();
 		let size = std::fs::metadata(dst).unwrap().size() / BUFLEN as u64;
-		let show_progress = size > 100;
+		let show_progress = size > 10;
 		let mut dst_reader = std::fs::File::open(dst).unwrap();
 		let mut count = 0;
 		loop {

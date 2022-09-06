@@ -84,6 +84,7 @@ impl Aosync {
 		let mut iter_dst = std::mem::take(list_dst)
 			.into_iter()
 			.peekable();
+		let mut cmp_count = 0;
 		let mut same_count = 0;
 		loop {
 			let p_src = if let Some(p) = iter_src.peek() {
@@ -122,10 +123,12 @@ impl Aosync {
 					} else {
 						if rng.gen::<f32>() < self.check {
 							eprintln!(
-								"Fcmp {} {:?}\r",
+								"\x1b[2Kc:{} s:{} r:{}",
+								cmp_count,
 								same_count,
-								p_dst.file_name().unwrap()
+								iter_dst.len(),
 							);
+							cmp_count += 1;
 							if !self.append_checker.is_append_of(
 								&self.src.clone().join(&p_src),
 								&self.dst.clone().join(&p_dst),

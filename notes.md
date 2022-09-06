@@ -1,3 +1,1 @@
-change: split
-
-todo: add test
+change: update readme

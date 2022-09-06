@@ -1,3 +1,3 @@
-change: full comparison
+change: split functions
 
-todo: clean, add test
+todo: split, add test

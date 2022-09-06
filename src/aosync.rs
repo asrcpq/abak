@@ -50,6 +50,7 @@ pub struct Aosync {
 	append_checker: AppendChecker,
 	dry_run: bool,
 	check: f32,
+	buf: [u8; BUFLEN],
 }
 
 impl Aosync {
@@ -60,6 +61,7 @@ impl Aosync {
 			append_checker: AppendChecker::default(),
 			dry_run: false,
 			check: 0.05,
+			buf: [0; BUFLEN],
 		}
 	}
 
@@ -215,6 +217,71 @@ impl Aosync {
 		append_items
 	}
 
+	fn perform_move_append(&mut self, append_items: &[SyncItem]) -> Vec<(PathBuf, PathBuf)> {
+		let mut final_move_list = Vec::new();
+		for item in append_items.iter() {
+			eprintln!(
+				"Append {:?} to {:?}, offset {}",
+				item.src, item.dst, item.offset
+			);
+			if self.dry_run {
+				continue;
+			}
+			let concat_src = self.src.clone().join(&item.src);
+			let concat_dst = self.dst.clone().join(&item.dst);
+			let concat_dst_moved = self.dst.clone().join(&item.src);
+			let concat_dst_tmp = build_tmp_path(&concat_dst_moved);
+			std::fs::create_dir_all(concat_dst_moved.parent().unwrap())
+				.unwrap();
+			std::fs::rename(&concat_dst, &concat_dst_tmp).unwrap();
+			let mut dst_file = std::fs::OpenOptions::new()
+				.append(true)
+				.open(&concat_dst_tmp)
+				.unwrap();
+			let mut src_file = std::fs::File::open(&concat_src).unwrap();
+			src_file
+				.seek(std::io::SeekFrom::Start(item.offset))
+				.unwrap();
+			loop {
+				let size = src_file.read(&mut self.buf).unwrap();
+				if size == 0 {
+					break;
+				}
+				dst_file.write_all(&self.buf[..size]).unwrap();
+			}
+			final_move_list.push((concat_dst_tmp, concat_dst_moved));
+		}
+		final_move_list
+	}
+
+	fn perform_new(&mut self, new_items: &[SyncItem]) {
+		for item in new_items.iter() {
+			eprintln!("Create {:?}", item.src);
+			if self.dry_run {
+				continue;
+			}
+			let concat_src = self.src.clone().join(&item.src);
+			let concat_dst = self.dst.clone().join(&item.dst);
+			std::fs::create_dir_all(concat_dst.parent().unwrap()).unwrap();
+			let mut dst_file = std::fs::OpenOptions::new()
+				.create_new(true)
+				.write(true)
+				.open(&concat_dst)
+				.unwrap();
+			let mut src_file = std::fs::File::open(&concat_src).unwrap();
+			src_file
+				.seek(std::io::SeekFrom::Start(item.offset))
+				.unwrap();
+			loop {
+				let size = src_file.read(&mut self.buf).unwrap();
+				if size == 0 {
+					break;
+				}
+				dst_file.write_all(&self.buf[..size]).unwrap();
+			}
+		}
+	}
+
 	// only sync file, not directory(but mkdir when necessary)
 	pub fn aosync(&mut self) {
 		if !std::path::Path::new(&self.dst).exists() {
@@ -254,67 +321,8 @@ impl Aosync {
 		assert_eq!(sum, original_src_len);
 
 		// perform the update
-		let mut final_move_list = Vec::new();
-		let mut buf = [0u8; BUFLEN];
-		for item in append_items.iter() {
-			eprintln!(
-				"Append {:?} to {:?}, offset {}",
-				item.src, item.dst, item.offset
-			);
-			if self.dry_run {
-				continue;
-			}
-			let concat_src = self.src.clone().join(&item.src);
-			let concat_dst = self.dst.clone().join(&item.dst);
-			let concat_dst_moved = self.dst.clone().join(&item.src);
-			let concat_dst_tmp = build_tmp_path(&concat_dst_moved);
-			std::fs::create_dir_all(concat_dst_moved.parent().unwrap())
-				.unwrap();
-			std::fs::rename(&concat_dst, &concat_dst_tmp).unwrap();
-			let mut dst_file = std::fs::OpenOptions::new()
-				.append(true)
-				.open(&concat_dst_tmp)
-				.unwrap();
-			let mut src_file = std::fs::File::open(&concat_src).unwrap();
-			src_file
-				.seek(std::io::SeekFrom::Start(item.offset))
-				.unwrap();
-			loop {
-				let size = src_file.read(&mut buf).unwrap();
-				if size == 0 {
-					break;
-				}
-				dst_file.write_all(&buf[..size]).unwrap();
-			}
-			final_move_list.push((concat_dst_tmp, concat_dst_moved));
-		}
-
-		for item in new_items.iter() {
-			eprintln!("Create {:?}", item.src);
-			if self.dry_run {
-				continue;
-			}
-			let concat_src = self.src.clone().join(&item.src);
-			let concat_dst = self.dst.clone().join(&item.dst);
-			std::fs::create_dir_all(concat_dst.parent().unwrap()).unwrap();
-			let mut dst_file = std::fs::OpenOptions::new()
-				.create_new(true)
-				.write(true)
-				.open(&concat_dst)
-				.unwrap();
-			let mut src_file = std::fs::File::open(&concat_src).unwrap();
-			src_file
-				.seek(std::io::SeekFrom::Start(item.offset))
-				.unwrap();
-			loop {
-				let size = src_file.read(&mut buf).unwrap();
-				if size == 0 {
-					break;
-				}
-				dst_file.write_all(&buf[..size]).unwrap();
-			}
-		}
-
+		let final_move_list = self.perform_move_append(&append_items);
+		self.perform_new(&new_items);
 		for (src, dst) in final_move_list.into_iter() {
 			std::fs::rename(&src, &dst).unwrap();
 		}

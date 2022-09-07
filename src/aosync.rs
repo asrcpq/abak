@@ -60,7 +60,7 @@ impl Aosync {
 			dst: dst.into(),
 			append_checker: AppendChecker::default(),
 			dry_run: false,
-			check: 0.05,
+			check: 0.03,
 			buf: [0; BUFLEN],
 		}
 	}

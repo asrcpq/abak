@@ -123,6 +123,7 @@ impl Aosync {
 						list_src.push(p_src);
 						list_dst.push(p_dst);
 					} else {
+						// rand f32 gen won't take 0 and 1, so check == 1 is safe for compare all
 						if rng.gen::<f32>() < self.check {
 							eprintln!(
 								"\x1b[2Kc:{} s:{} r:{}",

@@ -5,7 +5,4 @@ edition = "2021"
 
 [dependencies]
 rand = "0.8"
-
-[dependencies.aarg]
-git = "https://github.com/asrcpq/aarg"
-rev = "4ce9b93a80ea3d9e89c8ee205562a967b40a9dba"
+aarg = { git = "https://github.com/asrcpq/aarg" }

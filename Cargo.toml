@@ -5,4 +5,6 @@ edition = "2021"
 
 [dependencies]
 rand = "0.8"
-aarg = { git = "https://github.com/asrcpq/aarg" }
+
+[dependencies.aarg]
+git = "http://localhost:8080/git/3c7f74b3a07eb4904b2bf9118ca6662c36d5bf97.git"

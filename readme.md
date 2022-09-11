@@ -1,11 +1,29 @@
-# Append only backup
+# Dummy append only backup
 
 incremental backup my append-only filesystem (aofs),
 both src and dst directory can be mounted as append-only during backup.
 
+# usage
+
+```
+abak <src> <dst> [--check check_ratio]
+```
+
+# steps
+
+* exclude all files that match both size and path exactly in src and dst,
+compare full contents for a proportion of these files.
+
+* match all rest files in dst against src for first 4KB data,
+all file in dst must match exactly one unique file in src.
+
+* build the plan to move files, the rest files in src will be created
+
+* execute the plan
+
 # limitations
 
-## abak is incomplete!
+## incompleteness
 
 It only works for obvious cases of moved and appended files.
 

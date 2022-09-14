@@ -10,5 +10,8 @@ fn main() {
 	if let Some(v) = aarg.get("--check") {
 		abak.set_check(v[0].parse::<f32>().unwrap());
 	};
+	if let Some(v) = aarg.get("--limit") {
+		abak.set_limit(v[0].parse::<u64>().unwrap());
+	};
 	abak.aosync();
 }

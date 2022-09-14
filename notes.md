@@ -1,1 +1,3 @@
-change: update readme
+change: add limit option
+
+todo: logging

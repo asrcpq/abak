@@ -49,9 +49,10 @@ pub struct Aosync {
 	src: PathBuf,
 	dst: PathBuf,
 	append_checker: AppendChecker,
-	dry_run: bool,
+	dry: bool,
 	check: f32,
 	buf: [u8; BUFLEN],
+	limit: u64,
 }
 
 impl Aosync {
@@ -60,18 +61,24 @@ impl Aosync {
 			src: src.into(),
 			dst: dst.into(),
 			append_checker: AppendChecker::default(),
-			dry_run: false,
+			dry: false,
 			check: 0.03,
 			buf: [0; BUFLEN],
+			limit: u64::MAX,
 		}
 	}
 
 	pub fn set_dry_run(&mut self) {
-		self.dry_run = true;
+		self.dry = true;
 	}
 
 	pub fn set_check(&mut self, check: f32) {
 		self.check = check;
+	}
+
+	// limit the update(less then limit, in MiB)
+	pub fn set_limit(&mut self, limit: u64) {
+		self.limit = limit;
 	}
 
 	fn quick_pruning(
@@ -202,9 +209,10 @@ impl Aosync {
 					)
 				};
 				let dst_len = metadata(&dst_obj.full_path).unwrap().size();
-				let src_len = metadata(&dst_obj.full_path).unwrap().size();
+				let src_obj = &src_objects[match_idx];
+				let src_len = metadata(&src_obj.full_path).unwrap().size();
 				append_items.push(SyncItem {
-					src: src_objects[match_idx].path.clone(),
+					src: src_obj.path.clone(),
 					dst: dst_obj.path.clone(),
 					offset: dst_len,
 					len: src_len - dst_len,
@@ -227,9 +235,7 @@ impl Aosync {
 				"Append {:?} to {:?}, offset {}",
 				item.src, item.dst, item.offset
 			);
-			if self.dry_run {
-				continue;
-			}
+			if self.dry { continue }
 			let concat_src = self.src.clone().join(&item.src);
 			let concat_dst = self.dst.clone().join(&item.dst);
 			let concat_dst_moved = self.dst.clone().join(&item.src);
@@ -260,9 +266,7 @@ impl Aosync {
 	fn perform_new(&mut self, new_items: &[SyncItem]) {
 		for item in new_items.iter() {
 			eprintln!("Create {:?}", item.src);
-			if self.dry_run {
-				continue;
-			}
+			if self.dry { continue }
 			let concat_src = self.src.clone().join(&item.src);
 			let concat_dst = self.dst.clone().join(&item.dst);
 			std::fs::create_dir_all(concat_dst.parent().unwrap()).unwrap();
@@ -311,7 +315,9 @@ impl Aosync {
 			{
 				continue;
 			}
-			let len = std::fs::metadata(&path).unwrap().size();
+			let len = std::fs::metadata(self.src.clone().join(&path))
+				.unwrap()
+				.size();
 			new_items.push(SyncItem {
 				src: path.clone(),
 				dst: path,
@@ -322,11 +328,14 @@ impl Aosync {
 		}
 		let new_count = new_items.len();
 		eprintln!("Summary:");
-		eprintln!("create: {} = {}M", new_count, new_len / 1_000_000);
-		eprintln!("append: {} = {}M", moved_count, move_len / 1_000_000);
+		eprintln!("create: {} = {}M", new_count, new_len / (1 << 20));
+		eprintln!("append: {} = {}M", moved_count, move_len / (1 << 20));
 		eprintln!("same: {}", same_count);
 		let sum = new_count + moved_count + same_count;
 		assert_eq!(sum, original_src_len);
+		if new_len + move_len >= self.limit {
+			panic!("Limit exceeded, exit")
+		}
 
 		// perform the update
 		let final_move_list = self.perform_move_append(&append_items);

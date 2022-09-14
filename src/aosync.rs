@@ -41,7 +41,7 @@ fn get_filelist(root: PathBuf) -> Vec<PathBuf> {
 			}
 		}
 	}
-	eprintln!();
+	println!();
 	filelist
 }
 
@@ -133,7 +133,7 @@ impl Aosync {
 					} else {
 						// rand f32 gen won't take 0 and 1, so check == 1 is safe for compare all
 						if rng.gen::<f32>() < self.check {
-							eprintln!(
+							println!(
 								"\x1b[2Kc:{} s:{} r:{}",
 								cmp_count,
 								same_count,
@@ -170,7 +170,7 @@ impl Aosync {
 			let src_objects = sample_objects(&self.src, list_src);
 			dst_objects.sort_unstable_by_key(|x| x.sample_len);
 			for (idx, dst_obj) in dst_objects.iter().rev().enumerate() {
-				eprintln!("\x1b[2K{}/{}\r", idx, dst_objects.len());
+				println!("\x1b[2K{}/{}\r", idx, dst_objects.len());
 				// NOTE: replace this brute force method by a more efficient one
 				let mut match_idx = None;
 				for (idx, src_obj) in src_objects.iter().enumerate() {

@@ -1,3 +1,1 @@
-change: add limit option
-
-todo: logging
+change: stdout to log

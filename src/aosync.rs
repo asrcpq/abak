@@ -2,6 +2,7 @@ use rand::Rng;
 use std::cmp::Ordering as O;
 use std::ffi::OsString;
 use std::io::{Read, Seek, Write};
+use std::fs::metadata;
 use std::os::unix::fs::MetadataExt;
 use std::path::PathBuf;
 
@@ -113,10 +114,10 @@ impl Aosync {
 				O::Equal => {
 					let p_src = iter_src.next().unwrap();
 					let p_dst = iter_dst.next().unwrap();
-					let len1 = std::fs::metadata(self.src.clone().join(&p_src))
+					let len1 = metadata(self.src.clone().join(&p_src))
 						.unwrap()
 						.len();
-					let len2 = std::fs::metadata(self.dst.clone().join(&p_dst))
+					let len2 = metadata(self.dst.clone().join(&p_dst))
 						.unwrap()
 						.len();
 					if len1 != len2 {
@@ -200,12 +201,13 @@ impl Aosync {
 						dst_obj.path
 					)
 				};
+				let dst_len = metadata(&dst_obj.full_path).unwrap().size();
+				let src_len = metadata(&dst_obj.full_path).unwrap().size();
 				append_items.push(SyncItem {
 					src: src_objects[match_idx].path.clone(),
 					dst: dst_obj.path.clone(),
-					offset: std::fs::metadata(&dst_obj.full_path)
-						.unwrap()
-						.size(),
+					offset: dst_len,
+					len: src_len - dst_len,
 				})
 			}
 		}
@@ -298,8 +300,10 @@ impl Aosync {
 
 		let same_count = self.quick_pruning(&mut list_src, &mut list_dst);
 		let append_items = self.compute_append_items(&list_src, &list_dst);
+		let move_len: u64 = append_items.iter().map(|x| x.len).sum();
 		let moved_count = append_items.len();
 		let mut new_items = Vec::new();
+		let mut new_len = 0;
 		for path in list_src.into_iter() {
 			if append_items
 				.binary_search_by_key(&path, |item| item.src.clone())
@@ -307,18 +311,21 @@ impl Aosync {
 			{
 				continue;
 			}
+			let len = std::fs::metadata(&path).unwrap().size();
 			new_items.push(SyncItem {
 				src: path.clone(),
 				dst: path,
 				offset: 0,
+				len,
 			});
+			new_len += len;
 		}
-		let append_count = new_items.len();
-		eprintln!(
-			"Summary: {} new files + {} moved files + {} same files",
-			append_count, moved_count, same_count,
-		);
-		let sum = append_count + moved_count + same_count;
+		let new_count = new_items.len();
+		eprintln!("Summary:");
+		eprintln!("create: {} = {}M", new_count, new_len / 1_000_000);
+		eprintln!("append: {} = {}M", moved_count, move_len / 1_000_000);
+		eprintln!("same: {}", same_count);
+		let sum = new_count + moved_count + same_count;
 		assert_eq!(sum, original_src_len);
 
 		// perform the update

@@ -334,6 +334,7 @@ impl Aosync {
 		let sum = new_count + moved_count + same_count;
 		assert_eq!(sum, original_src_len);
 		if new_len + move_len >= self.limit {
+			println!("Limit exceeded, exit");
 			panic!("Limit exceeded, exit")
 		}
 

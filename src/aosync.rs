@@ -41,7 +41,7 @@ fn get_filelist(root: PathBuf) -> Vec<PathBuf> {
 			}
 		}
 	}
-	println!();
+	eprintln!();
 	filelist
 }
 
@@ -133,7 +133,7 @@ impl Aosync {
 					} else {
 						// rand f32 gen won't take 0 and 1, so check == 1 is safe for compare all
 						if rng.gen::<f32>() < self.check {
-							println!(
+							eprintln!(
 								"\x1b[2Kc:{} s:{} r:{}",
 								cmp_count,
 								same_count,
@@ -155,7 +155,7 @@ impl Aosync {
 				}
 			}
 		}
-		eprintln!(
+		println!(
 			"After quick pruning: {} and {} files",
 			list_src.len(),
 			list_dst.len()
@@ -170,7 +170,7 @@ impl Aosync {
 			let src_objects = sample_objects(&self.src, list_src);
 			dst_objects.sort_unstable_by_key(|x| x.sample_len);
 			for (idx, dst_obj) in dst_objects.iter().rev().enumerate() {
-				println!("\x1b[2K{}/{}\r", idx, dst_objects.len());
+				eprintln!("\x1b[2K{}/{}\r", idx, dst_objects.len());
 				// NOTE: replace this brute force method by a more efficient one
 				let mut match_idx = None;
 				for (idx, src_obj) in src_objects.iter().enumerate() {
@@ -231,7 +231,7 @@ impl Aosync {
 	fn perform_move_append(&mut self, append_items: &[SyncItem]) -> Vec<(PathBuf, PathBuf)> {
 		let mut final_move_list = Vec::new();
 		for item in append_items.iter() {
-			eprintln!(
+			println!(
 				"Append {:?} to {:?}, offset {}",
 				item.src, item.dst, item.offset
 			);
@@ -265,7 +265,7 @@ impl Aosync {
 
 	fn perform_new(&mut self, new_items: &[SyncItem]) {
 		for item in new_items.iter() {
-			eprintln!("Create {:?}", item.src);
+			println!("Create {:?}", item.src);
 			if self.dry { continue }
 			let concat_src = self.src.clone().join(&item.src);
 			let concat_dst = self.dst.clone().join(&item.dst);
@@ -300,7 +300,7 @@ impl Aosync {
 		let original_src_len = list_src.len();
 		let mut list_dst = get_filelist(self.dst.clone());
 		list_dst.sort_unstable();
-		eprintln!("Collected {} and {} files", list_src.len(), list_dst.len());
+		println!("Collected {} and {} files", list_src.len(), list_dst.len());
 
 		let same_count = self.quick_pruning(&mut list_src, &mut list_dst);
 		let append_items = self.compute_append_items(&list_src, &list_dst);
@@ -327,10 +327,10 @@ impl Aosync {
 			new_len += len;
 		}
 		let new_count = new_items.len();
-		eprintln!("Summary:");
-		eprintln!("create: {} = {}M", new_count, new_len / (1 << 20));
-		eprintln!("append: {} = {}M", moved_count, move_len / (1 << 20));
-		eprintln!("same: {}", same_count);
+		println!("Summary:");
+		println!("create: {} = {}M", new_count, new_len / (1 << 20));
+		println!("append: {} = {}M", moved_count, move_len / (1 << 20));
+		println!("same: {}", same_count);
 		let sum = new_count + moved_count + same_count;
 		assert_eq!(sum, original_src_len);
 		if new_len + move_len >= self.limit {

@@ -274,7 +274,7 @@ impl Aosync {
 				.create_new(true)
 				.write(true)
 				.open(&concat_dst)
-				.unwrap();
+				.expect(&format!("create {:?} failed", concat_dst));
 			let mut src_file = std::fs::File::open(&concat_src).unwrap();
 			src_file
 				.seek(std::io::SeekFrom::Start(item.offset))

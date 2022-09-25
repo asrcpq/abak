@@ -7,4 +7,4 @@ edition = "2021"
 rand = "0.8"
 
 [dependencies.aarg]
-git = "http://localhost:8080/git/asrcpq/aarg.git"
+path = "../aarg"

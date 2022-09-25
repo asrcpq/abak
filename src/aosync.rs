@@ -1,6 +1,6 @@
 use rand::Rng;
 use std::cmp::Ordering as O;
-use std::ffi::OsString;
+use std::ffi::{OsStr, OsString};
 use std::io::{Read, Seek, Write};
 use std::fs::metadata;
 use std::os::unix::fs::MetadataExt;
@@ -33,6 +33,7 @@ fn get_filelist(root: PathBuf) -> Vec<PathBuf> {
 			let path = entry.path();
 			if ty.is_file() {
 				count += 1;
+				assert!(path.extension() != Some(OsStr::new("abakt"))); // dirty tmp file
 				filelist.push(path.strip_prefix(&root).unwrap().to_path_buf());
 			} else if ty.is_dir() {
 				queue.push(path);

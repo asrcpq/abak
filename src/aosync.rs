@@ -128,6 +128,11 @@ impl Aosync {
 						.unwrap()
 						.len();
 					if len1 != len2 {
+						eprintln!(
+							"\x1b[2Kr:{} mismatch {:?}",
+							iter_dst.len(),
+							p_src,
+						);
 						list_src.push(p_src);
 						list_dst.push(p_dst);
 					} else {

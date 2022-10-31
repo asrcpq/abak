@@ -229,7 +229,7 @@ impl Aosync {
 		if (1..append_items.len())
 			.any(|idx| append_items[idx].src == append_items[idx - 1].src)
 		{
-			panic!("src object matched 2 dst objects");
+			eprintln!("src object matched 2 dst objects, but skip");
 		}
 		append_items
 	}

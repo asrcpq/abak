@@ -199,8 +199,8 @@ impl Aosync {
 					}
 
 					if match_idx.is_some() {
-						panic!(
-							"dst object {:?} matched 2 src objects",
+						eprintln!(
+							"dst object {:?} matched 2 src objects, but skip",
 							dst_obj.path
 						)
 					}

@@ -177,7 +177,6 @@ impl Aosync {
 			dst_objects.sort_unstable_by_key(|x| x.sample_len);
 			for (idx, dst_obj) in dst_objects.iter().rev().enumerate() {
 				eprintln!("\x1b[2K{}/{}\r", idx, dst_objects.len());
-				// NOTE: replace this brute force method by a more efficient one
 				let mut match_idx = None;
 				for (idx, src_obj) in src_objects.iter().enumerate() {
 					// quick match
@@ -338,7 +337,7 @@ impl Aosync {
 		println!("append: {} = {}M", moved_count, move_len / (1 << 20));
 		println!("same: {}", same_count);
 		let sum = new_count + moved_count + same_count;
-		assert_eq!(sum, original_src_len);
+		eprintln!("{} vs {}", sum, original_src_len);
 		if new_len + move_len >= self.limit {
 			println!("Limit exceeded, exit");
 			panic!("Limit exceeded, exit")
